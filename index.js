@@ -30,15 +30,17 @@ async function run() {
     const db = client.db('book_library_db')
     const booksCollection = db.collection('books')
 
+    
     //books api
     app.post('/books', async(req,res) => {
-       const book = req.body;
-       const result = booksCollection.insertOne(book);
+       const newBook = req.body;
+       const result = booksCollection.insertOne(newBook);
        res.send(result)
     })
 
     app.get('/books', async(req,res) => {
-
+     const result = await booksCollection.find().toArray();
+     res.send(result);
     })
 
 
@@ -54,7 +56,7 @@ run().catch(console.dir);
 
 
 app.get('/', (req, res) => {
-  res.send('book laybaray runing')
+  res.send('book library running')
 })
 
 app.listen(port, () => {
