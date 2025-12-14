@@ -28,9 +28,18 @@ async function run() {
 
 
     const db = client.db('book_library_db')
+    const usersCollection = db.collection('users')
     const booksCollection = db.collection('books')
 
     
+    //user api
+    app.post('/users', async (req, res) => {
+    const user = req.body;
+    await usersCollection.insertOne(user);
+    res.send({ success: true });
+   });
+
+     
     //books api
     app.post('/books', async(req,res) => {
        const newBook = req.body;
