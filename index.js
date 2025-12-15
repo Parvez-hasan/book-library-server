@@ -30,6 +30,7 @@ async function run() {
     const db = client.db('book_library_db')
     const usersCollection = db.collection('users')
     const booksCollection = db.collection('books')
+    const ordersCollection = db.collection('orders')
 
     
     //user api
@@ -50,6 +51,13 @@ async function run() {
     app.get('/books', async(req,res) => {
      const result = await booksCollection.find().toArray();
      res.send(result);
+    })
+
+    //order api 
+    app.post('/orders' , async (req, res) =>{
+       const order = req.body;
+       await ordersCollection.insertOne(order);
+       res.send({success: true})
     })
 
 
