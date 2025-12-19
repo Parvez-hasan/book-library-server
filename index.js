@@ -6,9 +6,19 @@ const app = express()
 const { MongoClient, ServerApiVersion } = require('mongodb');
 const port = process.env.PORT || 3000
 
+const stripe = require("stripe")(process.env.);
+
 // middleware
 app.use(express.json());
 app.use(cors())
+app.use(
+  cors({
+    origin: ["http://localhost:5173"],
+    credentials: true,
+    optionSuccessStatus: 200,
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+)
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@project-1.zd08b5r.mongodb.net/?appName=project-1`;
 
@@ -21,6 +31,36 @@ const client = new MongoClient(uri, {
   }
 });
 
+
+const admin = require("firebase-admin");
+// firebase  
+const decoded = Buffer.from(
+  process.env.FIREBASE_SECURE_KEY,
+  "base64"
+).toString("utf-8");
+const serviceAccount = JSON.parse(decoded);
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
+
+
+// jwt
+const verifyJWT = async (req, res, next) => {
+  const token = req?.headers?.authorization?.split(" ")[1];
+
+  if (!token) return res.status(401).send({ message: "Unauthorized Accesss!" });
+  try {
+    const decoded = await admin.auth().verifyIdToken(token);
+    req.tokenEmail = decoded.email;
+
+    next();
+  } catch (err) {
+    console.log(err);
+    return res.status(401).send({ message: "Unauthorized Accesss!", err });
+  }
+};
+
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
@@ -31,7 +71,30 @@ async function run() {
     const usersCollection = db.collection('users')
     const booksCollection = db.collection('books')
     const ordersCollection = db.collection('orders')
+    const paymentCollection = db.collection("payments");
+    const wishlistCollection = db.collection("wishlists");
+    const ratingCollection = db.collection("bookRatings");
 
+
+      // user role meantean
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.tokenEmail;
+      const users = await usersCollection.findOne({ email });
+      if (users?.role !== "admin")
+        return res
+          .status(403)
+          .seler({ message: "Admin Only Actions", role: users?.role });
+      next();
+    };
+    const verifyLibrarian = async (req, res, next) => {
+      const email = req.tokenEmail;
+      const users = await usersCollection.findOne({ email });
+      if (users?.role !== "Librarian")
+        return res
+          .status(403)
+          .seler({ message: "Seller Only Actions", role: users?.role });
+      next();
+    };
     
     //user api
     app.post('/users', async (req, res) => {
@@ -40,11 +103,42 @@ async function run() {
     res.send({ success: true });
    });
 
-   app.get('/users/role/:email', async (req, res) => {
-   const email = req.params.email;
-   const user = await usersCollection.findOne({ email });
-   res.send({ role: user?.role || 'user' });
-  });
+  //  app.get('/users/role/:email', async (req, res) => {
+  //  const email = req.params.email;
+  //  const user = await usersCollection.findOne({ email });
+  //  res.send({ role: user?.role || 'user' });
+  // });
+
+
+  app.get("/users/role/:email", async (req, res) => {
+  const email = req.query.email;
+
+  const user = await usersCollection.findOne({ email });
+
+  if (!user) {
+    return res.status(404).send({ role: "customer" });
+  }
+
+  res.send({ role: user.role || "customer" });
+});
+
+
+// GET user by email
+app.get("/users/:email", async (req, res) => {
+  try {
+    const email = req.params.email;
+
+    const user = await usersCollection.findOne({ email });
+
+    if (!user) {
+      return res.status(404).send({ message: "User not found" });
+    }
+
+    res.send(user);
+  } catch (error) {
+    res.status(500).send({ message: "Server error" });
+  }
+});
 
 
      
