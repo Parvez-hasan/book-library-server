@@ -95,8 +95,36 @@ async function run() {
           .seler({ message: "Seller Only Actions", role: users?.role });
       next();
     };
-    
+
     //user api
+    app.get("/all-users/:email", verifyJWT, verifyAdmin, async (req, res) => {
+      const adminEmail = req.params.email;
+      const result = await usersCollection
+        .find({ email: { $ne: adminEmail } })
+        .toArray();
+      res.send(result);
+    });
+
+      //user role
+    app.get("/user/role", async (req, res) => {
+      const email = req.query.email;
+      if (!email) return res.status(400).send({ error: "Email is required" });
+
+      const user = await usersCollection.findOne({ email });
+      if (!user) return res.status(404).send({ error: "User not found" });
+
+      res.send({ role: user.role });
+    });
+
+    app.get("/users/:email", verifyJWT, async (req, res) => {
+      const email = req.params.email;
+      const result = await usersCollection.findOne({ email });
+      res.send(result);
+    });
+
+    
+
+
     app.post('/users', async (req, res) => {
     const user = req.body;
     await usersCollection.insertOne(user);
