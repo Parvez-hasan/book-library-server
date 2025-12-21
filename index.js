@@ -11,15 +11,15 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET);
 
 // middleware
 app.use(express.json());
-app.use(cors())
 app.use(
   cors({
-    origin: ["http://localhost:5173"],
+    origin: "http://localhost:5173",
     credentials: true,
-    optionSuccessStatus: 200,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
-)
+);
+
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@project-1.zd08b5r.mongodb.net/?appName=project-1`;
 
@@ -39,7 +39,9 @@ const decoded = Buffer.from(
   process.env.FIREBASE_SECURE_KEY,
   "base64"
 ).toString("utf-8");
-const serviceAccount = JSON.parse(decoded);
+
+const serviceAccount = require("./bookcourier-firebase-adminsdk-key.json");
+//const serviceAccount = JSON.parse(decoded);
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -84,7 +86,7 @@ async function run() {
       if (users?.role !== "admin")
         return res
           .status(403)
-          .seler({ message: "Admin Only Actions", role: users?.role });
+          .send({ message: "Admin Only Actions", role: users?.role });
       next();
     };
 
@@ -94,7 +96,7 @@ async function run() {
       if (users?.role !== "Librarian")
         return res
           .status(403)
-          .seler({ message: "Seller Only Actions", role: users?.role });
+          .send({ message: "Librarian Only Actions", role: users?.role });
       next();
     };
 
@@ -109,7 +111,7 @@ async function run() {
 
 
       //user role
-    app.get("/user/role", async (req, res) => {
+    app.get("/user/role", verifyJWT, async (req, res) => {
       const email = req.query.email;
       if (!email) return res.status(400).send({ error: "Email is required" });
 
@@ -244,7 +246,7 @@ async function run() {
     });
 
 
-    app.post("/books", verifyJWT, verifyLibrari, async (req, res) => {
+    app.post("/books", verifyJWT, async (req, res) => {
       const newBook = req.body;
       newBook.create_date = new Date();
       const result = await booksCollection.insertOne(newBook);
@@ -360,6 +362,106 @@ async function run() {
       }
     });
 
+
+
+    
+    // payments all api 
+    app.post("/create-checkout-session", verifyJWT, async (req, res) => {
+      const paymentInfo = req.body;
+      const amount = parseInt(paymentInfo.price) * 100;
+      const session = await stripe.checkout.sessions.create({
+        line_items: [
+          {
+            price_data: {
+              currency: "usd",
+              unit_amount: amount,
+              product_data: {
+                name: paymentInfo.name,
+              },
+            },
+
+            quantity: 1,
+          },
+        ],
+        customer_email: paymentInfo.customerEmail,
+        mode: "payment",
+        metadata: {
+          orderId: paymentInfo._id,
+        },
+        // success_url: `http://localhost:5173/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+        // cancel_url: `http://localhost:5173/dashboard/my-orders`,
+
+      //  success_url: `https://book-courier-client-site.vercel.app/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      //  cancel_url: `https://book-courier-client-site.vercel.app/dashboard/my-orders`,
+      });
+      res.send({ url: session.url });
+    });
+
+    app.patch("/payment-success", verifyJWT, async (req, res) => {
+      const sessionId = req.query.session_id;
+
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      const orderId = session?.metadata?.orderId;
+      const orderQuery = { _id: new ObjectId(orderId) };
+
+      const books = await ordersCollection.findOne(orderQuery);
+
+      //  before paid
+      const existingPayment = await paymentCollection.findOne({
+        transationId: session.payment_intent,
+      });
+
+      if (existingPayment) {
+        return res.send({
+          message: "Payment already process",
+          transationId: existingPayment.transationId,
+        });
+      }
+
+      if (session.payment_status === "paid" && books) {
+        const orderInfo = {
+          orderId: orderId,
+          transationId: session.payment_intent,
+          bookName: books.name,
+          authorName: books.authorName,
+          authorEmail: books.authorEmail,
+          customer_email: session.customer_email,
+          customer_name: books.customerName,
+          payment_date: new Date(),
+          status: books.status,
+          price: session.amount_total / 100,
+        };
+
+        const result = await paymentCollection.insertOne(orderInfo);
+
+        await ordersCollection.updateOne(orderQuery, {
+          $set: { paymentStatus: session.payment_status },
+          $inc: { quantity: -1 },
+        });
+
+        return res.send({
+          transationId: session.payment_intent,
+          orderId: result.insertedId,
+        });
+      }
+
+      return res.send({ message: "Payment not completed" });
+    });
+
+
+    app.get("/payments/:email", verifyJWT, async (req, res) => {
+      const email = req.params.email;
+      const result = await paymentCollection
+        .find({ customer_email: email })
+        .sort({ payment_date: -1 })
+        .toArray();
+      res.send(result);
+    });
+
+    app.get("/paymets-all", verifyJWT, verifyADMIN, async (req, res) => {
+      const result = await paymentCollection.find().toArray();
+      res.send(result);
+    });
 
 
 
