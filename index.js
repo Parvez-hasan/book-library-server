@@ -76,7 +76,7 @@ async function run() {
     const ratingCollection = db.collection("bookRatings");
 
 
-      // user role meantean
+      // user role meantean //
     const verifyAdmin = async (req, res, next) => {
       const email = req.tokenEmail;
       const users = await usersCollection.findOne({ email });
@@ -87,7 +87,7 @@ async function run() {
       next();
     };
 
-    const verifyLibrarian = async (req, res, next) => {
+    const verifyLibrari = async (req, res, next) => {
       const email = req.tokenEmail;
       const users = await usersCollection.findOne({ email });
       if (users?.role !== "Librarian")
@@ -171,31 +171,124 @@ async function run() {
 
 
 
+    // books releated api //
+
+     app.get("/books", async (req, res) => {
+      const publishBook = "published";
+      const search = req.query.search || "";
+      const sort = req.query.sort || "";
+
+      let filter = {
+        status: publishBook,
+      };
+
+      if (search) {
+        filter.bookTitle = { $regex: search, $options: "i" };
+      }
+
+      let sortOption = {};
+      if (sort === "low-high") {
+        sortOption = { price: 1 };
+      } else if (sort === "high-low") {
+        sortOption = { price: -1 };
+      } else {
+        sortOption = { create_date: -1 };
+      }
+      const result = await booksCollection
+        .find(filter)
+        .sort(sortOption)
+        .toArray();
+
+      res.send(result);
+
+    });
+
+
+    app.get("/mange-books", verifyJWT, verifyAdmin, async (req, res) => {
+      const result = await booksCollection
+        .find()
+        .sort({ create_date: -1 })
+        .toArray();
+      res.send(result);
+    });
+
+
+    app.get(
+      "/my-books/:email",
+      verifyJWT,
+      verifyLibrari,
+      async (req, res) => {
+        const email = req.params.email;
+        const result = await booksCollection
+          .find({ authorEmail: email })
+          .toArray();
+        res.send(result);
+      }
+    );
+
+
+    app.get("/books/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await booksCollection.findOne(query);
+      res.send(result);
+    });
+
+
+    app.get("/update-book/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await booksCollection.findOne(query);
+      res.send(result);
+    });
+
+
+    app.post("/books", verifyJWT, verifyLibrari, async (req, res) => {
+      const newBook = req.body;
+      newBook.create_date = new Date();
+      const result = await booksCollection.insertOne(newBook);
+      res.send(result);
+    });
+
+
+    app.put("/books/:id", verifyJWT, verifyLibrari, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const updateBook = req.body;
+      const updateDoc = { $set: updateBook };
+      const result = await booksCollection.updateOne(query, updateDoc);
+      res.send(result);
+    });
+
+
+    app.delete("/books/:id", verifyJWT, verifyLibrari, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const existingData = await booksCollection.findOne(query);
+      if (existingData.status === "published") {
+        return res.send({ message: "book publish not delete" });
+      }
+      const result = await booksCollection.deleteOne(query);
+      res.send(result);
+    });
+
+
+      // latest books 6 to show home
+    app.get("/latest", async (req, res) => {
+      const publishBook = "published";
+      const result = await booksCollection
+        .find({ status: publishBook })
+        .sort({ create_date: -1 })
+        .limit(6)
+        .toArray();
+      res.send(result);
+    });
 
 
 
-    
+
 
      
-    //books api
-    app.post('/books', async(req,res) => {
-       const newBook = req.body;
-       const result = booksCollection.insertOne(newBook);
-       res.send(result)
-    })
-
-    app.get('/books', async(req,res) => {
-     const result = await booksCollection.find().toArray();
-     res.send(result);
-    })
-
-    //order api 
-    app.post('/orders' , async (req, res) =>{
-       const order = req.body;
-       await ordersCollection.insertOne(order);
-       res.send({success: true})
-    })
-
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
