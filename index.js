@@ -6,7 +6,8 @@ const app = express()
 const { MongoClient, ServerApiVersion } = require('mongodb');
 const port = process.env.PORT || 3000
 
-const stripe = require("stripe")(process.env.);
+const stripe = require("stripe")(process.env.STRIPE_SECRET);
+
 
 // middleware
 app.use(express.json());
@@ -273,6 +274,19 @@ async function run() {
     });
 
 
+      // book publish and unpublish api
+    app.patch("/books/:id", verifyJWT, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          status: req.body.status,
+        },
+      };
+      const result = await booksCollection.updateOne(query, updateDoc);
+      res.send(result);
+    });
+
       // latest books 6 to show home
     app.get("/latest", async (req, res) => {
       const publishBook = "published";
@@ -284,6 +298,67 @@ async function run() {
       res.send(result);
     });
 
+
+     // Order Book api
+    app.get(
+      "/orders/:email/payments",
+      verifyJWT,
+      verifyLibrari,
+      async (req, res) => {
+        const email = req.params.email;
+        const result = await ordersCollection
+          .find({ authorEmail: email, paymentStatus: "paid" })
+          .toArray();
+        res.send(result);
+      }
+    );
+
+    app.get("/orders/:email", verifyJWT, async (req, res) => {
+      const email = req.params.email;
+      const result = await ordersCollection
+        .find({ customerEmail: email })
+        .toArray();
+      res.send(result);
+    });
+
+    app.post("/orders", verifyJWT, async (req, res) => {
+      const newOrder = req.body;
+      newOrder.status = "pending";
+      newOrder.paymentStatus = "unpaid";
+      newOrder.order_date = new Date();
+      const result = await ordersCollection.insertOne(newOrder);
+      res.send(result);
+    });
+
+    app.patch("/order/:id", verifyJWT, verifyLibrari, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const statusUpdate = req.body;
+
+      const updateDoc = {
+        $set: { status: statusUpdate.status },
+      };
+
+      await paymentCollection.updateOne({ orderId: id }, updateDoc);
+
+      const result = await ordersCollection.updateOne(query, updateDoc);
+      res.send(result);
+    });
+
+    app.patch("/order-cancelled/:id", verifyJWT, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+
+  
+      const updateDoc = { $set: { status: req.body.status } };
+
+      try {
+        const result = await ordersCollection.updateOne(query, updateDoc);
+        res.send(result);
+      } catch (err) {
+        res.status(500).send({ message: "Internal Server Error", error: err });
+      }
+    });
 
 
 
