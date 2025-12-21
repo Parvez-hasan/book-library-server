@@ -86,6 +86,7 @@ async function run() {
           .seler({ message: "Admin Only Actions", role: users?.role });
       next();
     };
+
     const verifyLibrarian = async (req, res, next) => {
       const email = req.tokenEmail;
       const users = await usersCollection.findOne({ email });
@@ -105,6 +106,7 @@ async function run() {
       res.send(result);
     });
 
+
       //user role
     app.get("/user/role", async (req, res) => {
       const email = req.query.email;
@@ -122,52 +124,57 @@ async function run() {
       res.send(result);
     });
 
+     app.post("/users", async (req, res) => {
+      const newUser = req.body;
+      newUser.create_date = new Date();
+      newUser.last_loggedIn = new Date();
+      newUser.role = "customer";
+      const query = { email: newUser.email };
+      const alreadyExist = await usersCollection.findOne(query);
+      if (alreadyExist) {
+        const updateUser = await usersCollection.updateOne(query, {
+          $set: { last_loggedIn: new Date() },
+        });
+        return res.send(updateUser);
+      }
+      const result = await usersCollection.insertOne(newUser);
+      res.send(result);
+    });
+
+
+    // user profile update
+    app.patch("/users/:id", verifyJWT, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const updateUser = req.body;
+      const updateProfile = { name: updateUser.name, image: updateUser.image };
+      const updateDoc = { $set: updateProfile };
+      const result = await usersCollection.updateOne(query, updateDoc);
+      res.send(result);
+    });
+
+    // Role Update
+    app.patch("/user-role", verifyJWT, verifyAdmin, async (req, res) => {
+      const email = req.body.email;
+      const query = { email: email };
+      const roleUpdate = req.body;
+      const updateDocument = {
+        $set: {
+          role: roleUpdate.role,
+        },
+      };
+      const result = await usersCollection.updateOne(query, updateDocument);
+      res.send(result);
+    });
+
+
+
+
+
+
+
+
     
-
-
-    app.post('/users', async (req, res) => {
-    const user = req.body;
-    await usersCollection.insertOne(user);
-    res.send({ success: true });
-   });
-
-  //  app.get('/users/role/:email', async (req, res) => {
-  //  const email = req.params.email;
-  //  const user = await usersCollection.findOne({ email });
-  //  res.send({ role: user?.role || 'user' });
-  // });
-
-
-  app.get("/users/role/:email", async (req, res) => {
-  const email = req.query.email;
-
-  const user = await usersCollection.findOne({ email });
-
-  if (!user) {
-    return res.status(404).send({ role: "customer" });
-  }
-
-  res.send({ role: user.role || "customer" });
-});
-
-
-// GET user by email
-app.get("/users/:email", async (req, res) => {
-  try {
-    const email = req.params.email;
-
-    const user = await usersCollection.findOne({ email });
-
-    if (!user) {
-      return res.status(404).send({ message: "User not found" });
-    }
-
-    res.send(user);
-  } catch (error) {
-    res.status(500).send({ message: "Server error" });
-  }
-});
-
 
      
     //books api
