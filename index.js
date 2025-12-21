@@ -54,7 +54,7 @@ const verifyJWT = async (req, res, next) => {
 
   if (!token) return res.status(401).send({ message: "Unauthorized Accesss!" });
   try {
-    const decoded = await admin.auth().verifyIdToken(token);
+   // const decoded = await admin.auth().verifyIdToken(token);
     req.tokenEmail = decoded.email;
 
     next();
@@ -458,13 +458,35 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/paymets-all", verifyJWT, verifyADMIN, async (req, res) => {
+    app.get("/paymets-all", verifyJWT, verifyAdmin, async (req, res) => {
       const result = await paymentCollection.find().toArray();
       res.send(result);
     });
 
 
 
+     // Book Rating API 
+    app.get("/review/:bookId", verifyJWT, async (req, res) => {
+      const bookId = req.params.bookId;
+      const email = req.tokenEmail;
+      const query = { email: email, bookId: bookId };
+      const reviews = await ratingCollection
+        .find(query)
+        .sort({ date: -1 })
+        .toArray();
+      res.send(reviews);
+    });
+
+    app.post("/review", async (req, res) => {
+      const review = req.body;
+      const existingRating = await ratingCollection.findOne({
+        bookId: review.bookId,
+      });
+
+      review.date = new Date();
+      const result = await ratingCollection.insertOne(review);
+      res.send({ insertedId: result.insertedId });
+    });
      
 
     // Send a ping to confirm a successful connection
