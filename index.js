@@ -82,7 +82,7 @@ const verifyJWT = async (req, res, next) => {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+   // await client.connect();
 
 
     const db = client.db('book_library_db')
@@ -127,7 +127,7 @@ async function run() {
 
 
       //user role
-    app.get("/user/role", verifyJWT, async (req, res) => {
+    app.get("/user/role", async (req, res) => {
       const email = req.query.email;
       if (!email) return res.status(400).send({ error: "Email is required" });
 
@@ -384,8 +384,6 @@ async function run() {
       }
     });
 
-
-
     
     // payments all api 
     app.post("/create-checkout-session", verifyJWT, async (req, res) => {
@@ -413,8 +411,8 @@ async function run() {
         // success_url: `http://localhost:5173/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`,
         // cancel_url: `http://localhost:5173/dashboard/my-orders`,
 
-      //  success_url: `https://book-courier-client-site.vercel.app/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-      //  cancel_url: `https://book-courier-client-site.vercel.app/dashboard/my-orders`,
+        success_url: `https://book-library-server-tau.vercel.app/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `https://book-library-server-tau.vercel.app/dashboard/my-orders`,
       });
       res.send({ url: session.url });
     });
