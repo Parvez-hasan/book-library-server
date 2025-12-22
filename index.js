@@ -12,15 +12,29 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET);
 
 
 // middleware
-app.use(express.json());
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://book-librariary-a-11.netlify.app"
+];
+
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: function (origin, callback) {
+      // allow requests with no origin (like mobile apps, curl)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization"]
   })
 );
+app.use(express.json());
 
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@project-1.zd08b5r.mongodb.net/?appName=project-1`;
@@ -48,7 +62,6 @@ admin.initializeApp({
 });
 
 
-
 // jwt
 const verifyJWT = async (req, res, next) => {
   const token = req?.headers?.authorization?.split(" ")[1];
@@ -64,28 +77,6 @@ const verifyJWT = async (req, res, next) => {
     return res.status(401).send({ message: "Unauthorized Accesss!", err });
   }
 };
-
-// const jwt = require("jsonwebtoken");
-
-// const verifyJWT = (req, res, next) => {
-//   const authHeader = req.headers.authorization;
-//   if (!authHeader) {
-//     return res.status(401).send({ message: "Unauthorized Access!" });
-//   }
-
-//   const token = authHeader.split(" ")[1];
-
-//   jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
-//     if (err) {
-//       return res.status(401).send({ message: "Unauthorized Access!" });
-//     }
-
-//     req.tokenEmail = decoded.email;
-//     next();
-//   });
-// };
-
-// module.exports = verifyJWT;
 
 
 async function run() {
@@ -199,7 +190,7 @@ async function run() {
 
     // books releated api //
 
-     app.get("/books", async (req, res) => {
+     app.get("/books", async  (req, res) => {
       const publishBook = "published";
       const search = req.query.search || "";
       const sort = req.query.sort || "";
@@ -555,8 +546,8 @@ async function run() {
 
 
     // Send a ping to confirm a successful connection
-    // await client.db("admin").command({ ping: 1 });
-    // console.log("Pinged your deployment. You successfully connected to MongoDB!");
+     await client.db("admin").command({ ping: 1 });
+    console.log("Pinged your deployment. You successfully connected to MongoDB!");
 
   } finally {
     // Ensures that the client will close when you finish/error

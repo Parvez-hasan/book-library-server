@@ -2,3 +2,4 @@ node_modules
 .env
 
 bookcourier-firebase-adminsdk-key.json
+.vercel
