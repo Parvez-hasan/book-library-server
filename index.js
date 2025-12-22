@@ -36,18 +36,17 @@ const client = new MongoClient(uri, {
 
 
 const admin = require("firebase-admin");
-// firebase  
-const decoded = Buffer.from(
-  process.env.FIREBASE_SECURE_KEY,
-  "base64"
-).toString("utf-8");
 
-const serviceAccount = require("./bookcourier-firebase-adminsdk-key.json");
-//const serviceAccount = JSON.parse(decoded);
+
+// const serviceAccount = require("./firebase-admin-key.json");
+
+const decoded = Buffer.from(process.env.FB_SERVICES_KEY, 'base64').toString('utf8')
+const serviceAccount = JSON.parse(decoded);
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
+
 
 
 // jwt
@@ -56,7 +55,7 @@ const verifyJWT = async (req, res, next) => {
 
   if (!token) return res.status(401).send({ message: "Unauthorized Accesss!" });
   try {
-   // const decoded = await admin.auth().verifyIdToken(token);
+    const decoded = await admin.auth().verifyIdToken(token);
     req.tokenEmail = decoded.email;
 
     next();
@@ -66,6 +65,29 @@ const verifyJWT = async (req, res, next) => {
   }
 };
 
+// const jwt = require("jsonwebtoken");
+
+// const verifyJWT = (req, res, next) => {
+//   const authHeader = req.headers.authorization;
+//   if (!authHeader) {
+//     return res.status(401).send({ message: "Unauthorized Access!" });
+//   }
+
+//   const token = authHeader.split(" ")[1];
+
+//   jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+//     if (err) {
+//       return res.status(401).send({ message: "Unauthorized Access!" });
+//     }
+
+//     req.tokenEmail = decoded.email;
+//     next();
+//   });
+// };
+
+// module.exports = verifyJWT;
+
+
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
@@ -73,6 +95,7 @@ async function run() {
 
 
     const db = client.db('book_library_db')
+
     const usersCollection = db.collection('users')
     const booksCollection = db.collection('books')
     const ordersCollection = db.collection('orders')
@@ -507,7 +530,7 @@ async function run() {
       res.send(result);
     });
 
-    
+
     app.post("/wish-list", async (req, res) => {
       const newWishList = req.body;
       const existingWishList = await wishlistCollection.findOne({
@@ -532,8 +555,9 @@ async function run() {
 
 
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    // await client.db("admin").command({ ping: 1 });
+    // console.log("Pinged your deployment. You successfully connected to MongoDB!");
+
   } finally {
     // Ensures that the client will close when you finish/error
    // await client.close();
